@@ -16,8 +16,15 @@ PIP_PACKAGES=(
 )
 
 NODES=(
-    #"https://github.com/ltdrdata/ComfyUI-Manager"
-    #"https://github.com/cubiq/ComfyUI_essentials"
+    "https://github.com/Lightricks/ComfyUI-LTXVideo"
+    "https://github.com/yolain/ComfyUI-Easy-Use"
+    "https://github.com/kijai/ComfyUI-KJNodes"
+    "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite"
+    "https://github.com/Suzie1/ComfyUI_Comfyroll_CustomNodes"
+    "https://github.com/jamesWalker55/comfyui-various"
+    "https://github.com/kijai/ComfyUI-MelBandRoFormer"
+    "https://github.com/PGCRT/CRT-Nodes"
+    "https://github.com/olduvai-jp/ComfyUI-S3-IO"
 )
 
 WORKFLOWS=(
@@ -112,7 +119,7 @@ function provisioning_get_pip_packages() {
 function provisioning_get_nodes() {
     for repo in "${NODES[@]}"; do
         dir="${repo##*/}"
-        path="${COMFYUI_DIR}custom_nodes/${dir}"
+        path="${COMFYUI_DIR}/custom_nodes/${dir}"
         requirements="${path}/requirements.txt"
         if [[ -d $path ]]; then
             if [[ ${AUTO_UPDATE,,} != "false" ]]; then
@@ -127,6 +134,10 @@ function provisioning_get_nodes() {
             git clone "${repo}" "${path}" --recursive
             if [[ -e $requirements ]]; then
                 pip install --no-cache-dir -r "${requirements}"
+            fi
+            if [[ -e "${path}/install.py" ]]; then
+                printf "Running install.py for %s...\n" "${dir}"
+                ( cd "${path}" && python install.py )
             fi
         fi
     done
