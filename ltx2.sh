@@ -25,16 +25,33 @@ WORKFLOWS=(
 )
 
 CHECKPOINT_MODELS=(
-    "https://civitai.com/api/download/models/798204?type=Model&format=SafeTensor&size=full&fp=fp16"
 )
 
 UNET_MODELS=(
 )
 
+DIFFUSION_MODELS=(
+    "https://huggingface.co/Kijai/LTXV2_comfy/resolve/main/diffusion_models/ltx-2-19b-dev_transformer_only_bf16.safetensors"
+    "https://huggingface.co/Kijai/MelBandRoFormer_comfy/resolve/main/MelBandRoformer_fp16.safetensors"
+)
+
 LORA_MODELS=(
+    "https://huggingface.co/Lightricks/LTX-2/resolve/main/ltx-2-19b-distilled-lora-384.safetensors"
+    "https://huggingface.co/Lightricks/LTX-2-19b-IC-LoRA-Detailer/resolve/main/ltx-2-19b-ic-lora-detailer.safetensors"
+    "https://huggingface.co/Nebsh/LTX2_Herocam_Lora/resolve/main/HeroCam_LTX2_bucket113_step_1500.safetensors"
 )
 
 VAE_MODELS=(
+    "https://huggingface.co/Kijai/LTXV2_comfy/resolve/main/VAE/LTX2_video_vae_bf16.safetensors"
+    "https://huggingface.co/Kijai/LTXV2_comfy/resolve/main/VAE/LTX2_audio_vae_bf16.safetensors"
+)
+
+TEXT_ENCODER_MODELS=(
+    "https://huggingface.co/Comfy-Org/ltx-2/resolve/main/split_files/text_encoders/gemma_3_12B_it_fp8_scaled.safetensors"
+)
+
+CLIP_MODELS=(
+    "https://huggingface.co/Kijai/LTXV2_comfy/resolve/main/text_encoders/ltx-2-19b-embeddings_connector_distill_bf16.safetensors"
 )
 
 ESRGAN_MODELS=(
@@ -57,7 +74,10 @@ function provisioning_start() {
         "${COMFYUI_DIR}/models/unet" \
         "${UNET_MODELS[@]}"
     provisioning_get_files \
-        "${COMFYUI_DIR}/models/lora" \
+        "${COMFYUI_DIR}/models/diffusion_models" \
+        "${DIFFUSION_MODELS[@]}"
+    provisioning_get_files \
+        "${COMFYUI_DIR}/models/loras" \
         "${LORA_MODELS[@]}"
     provisioning_get_files \
         "${COMFYUI_DIR}/models/controlnet" \
@@ -65,6 +85,12 @@ function provisioning_start() {
     provisioning_get_files \
         "${COMFYUI_DIR}/models/vae" \
         "${VAE_MODELS[@]}"
+    provisioning_get_files \
+        "${COMFYUI_DIR}/models/text_encoders" \
+        "${TEXT_ENCODER_MODELS[@]}"
+    provisioning_get_files \
+        "${COMFYUI_DIR}/models/clip" \
+        "${CLIP_MODELS[@]}"
     provisioning_get_files \
         "${COMFYUI_DIR}/models/esrgan" \
         "${ESRGAN_MODELS[@]}"
