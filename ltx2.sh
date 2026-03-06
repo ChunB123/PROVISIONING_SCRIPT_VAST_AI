@@ -11,8 +11,8 @@ APT_PACKAGES=(
 )
 
 PIP_PACKAGES=(
-    #"package-1"
-    #"package-2"
+    "boto3"
+    "requests"
 )
 
 NODES=(
@@ -101,6 +101,20 @@ function provisioning_start() {
     provisioning_get_files \
         "${COMFYUI_DIR}/models/esrgan" \
         "${ESRGAN_MODELS[@]}"
+    # Download and start the SQS consumer
+    CONSUMER_URL="https://raw.githubusercontent.com/ChunB123/PROVISIONING_SCRIPT_VAST_AI/refs/heads/main/consumer.py"
+    CONSUMER_PATH="/workspace/consumer.py"
+    CONSUMER_LOG="/workspace/consumer.log"
+    printf "Downloading consumer.py...\n"
+    wget -qO "$CONSUMER_PATH" "$CONSUMER_URL"
+    if [[ -f "$CONSUMER_PATH" ]]; then
+        printf "Starting consumer.py in background...\n"
+        nohup /venv/main/bin/python "$CONSUMER_PATH" >> "$CONSUMER_LOG" 2>&1 &
+        echo $! > /workspace/consumer.pid
+        printf "Consumer started with PID %s. Logs: %s\n" "$(cat /workspace/consumer.pid)" "$CONSUMER_LOG"
+    else
+        printf "WARNING: Failed to download consumer.py\n"
+    fi
     provisioning_print_end
 }
 
