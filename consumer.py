@@ -40,6 +40,10 @@ COMFYUI_OUTPUT_DIR = os.environ.get(
     "COMFYUI_OUTPUT_DIR",
     os.path.join(os.environ.get("WORKSPACE", "/workspace"), "ComfyUI", "output"),
 )
+COMFYUI_INPUT_DIR = os.environ.get(
+    "COMFYUI_INPUT_DIR",
+    os.path.join(os.environ.get("WORKSPACE", "/workspace"), "ComfyUI", "input"),
+)
 
 S3_BUCKET = os.environ.get("S3_BUCKET", "")
 S3_PREFIX = os.environ.get("S3_PREFIX", "outputs/")
@@ -71,6 +75,22 @@ def wait_for_comfyui():
         except requests.ConnectionError:
             pass
         time.sleep(3)
+
+
+def download_s3_inputs(s3_client, workflow):
+    """Download S3-linked files to the ComfyUI input dir and rewrite paths to filenames."""
+    for node_id, node in workflow.items():
+        inputs = node.get("inputs", {})
+        for key, value in inputs.items():
+            if isinstance(value, str) and value.startswith("s3://"):
+                parts = value[5:].split("/", 1)
+                bucket = parts[0]
+                s3_key = parts[1]
+                filename = os.path.basename(s3_key)
+                local_path = os.path.join(COMFYUI_INPUT_DIR, filename)
+                print(f"  Downloading s3://{bucket}/{s3_key} -> {local_path}")
+                s3_client.download_file(bucket, s3_key, local_path)
+                inputs[key] = filename
 
 
 def submit_prompt(workflow):
@@ -149,6 +169,8 @@ def upload_to_s3(s3_client, local_path):
 def process_message(s3_client, body):
     """Run the full pipeline: submit workflow, wait, upload, cleanup."""
     workflow = json.loads(body)
+
+    download_s3_inputs(s3_client, workflow)
 
     prompt_id = submit_prompt(workflow)
     history_entry = wait_for_completion(prompt_id, timeout=VISIBILITY_TIMEOUT - 60)
