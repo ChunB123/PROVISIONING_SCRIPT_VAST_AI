@@ -172,6 +172,9 @@ def process_message(s3_client, body):
 
     download_s3_inputs(s3_client, workflow)
 
+    # Unique noise seed for each generation
+    workflow["178"]["inputs"]["noise_seed"] = int(time.time_ns())
+
     prompt_id = submit_prompt(workflow)
     history_entry = wait_for_completion(prompt_id, timeout=VISIBILITY_TIMEOUT - 60)
 
