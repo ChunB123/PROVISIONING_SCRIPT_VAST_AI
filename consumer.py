@@ -6,18 +6,6 @@ Polls SQS for ComfyUI API-format workflow JSON, submits to ComfyUI,
 waits for completion, uploads output video to S3, cleans up, and loops.
 
 Processes one message at a time.
-
-Environment variables:
-    SQS_ENDPOINT_URL   - SQS endpoint (e.g. ngrok URL)
-    SQS_QUEUE_URL      - Full SQS queue URL
-    SQS_REGION         - AWS region (default: us-east-1)
-    SQS_ACCESS_KEY_ID  - AWS access key (default: test)
-    SQS_SECRET_ACCESS_KEY - AWS secret key (default: test)
-    COMFYUI_URL        - ComfyUI server URL (default: http://127.0.0.1:8188)
-    COMFYUI_OUTPUT_DIR - ComfyUI output directory (default: $WORKSPACE/ComfyUI/output)
-    S3_BUCKET          - S3 bucket for video uploads
-    S3_UPLOAD_PREFIX           - S3 key prefix (default: outputs/)
-    VISIBILITY_TIMEOUT - SQS visibility timeout in seconds (default: 900)
 """
 
 import boto3
@@ -30,15 +18,14 @@ import glob
 import signal
 
 SQS_QUEUE_URL = os.environ.get("SQS_QUEUE_URL")
+S3_BUCKET = os.environ.get("S3_BUCKET")
+
 SQS_REGION = "ca-central-1"
-SQS_ACCESS_KEY_ID = os.environ.get("SQS_ACCESS_KEY_ID")
-SQS_SECRET_ACCESS_KEY = os.environ.get("SQS_SECRET_ACCESS_KEY")
 
 COMFYUI_URL = "http://127.0.0.1:18188"
 COMFYUI_OUTPUT_DIR = os.path.join("/workspace", "ComfyUI", "output")
 COMFYUI_INPUT_DIR = os.path.join("/workspace", "ComfyUI", "input")
 
-S3_BUCKET = os.environ.get("S3_BUCKET")
 S3_UPLOAD_PREFIX = "outputs/"
 
 VISIBILITY_TIMEOUT = 1200
@@ -208,8 +195,6 @@ def main():
     sqs = boto3.client(
         "sqs",
         region_name=SQS_REGION,
-        aws_access_key_id=SQS_ACCESS_KEY_ID,
-        aws_secret_access_key=SQS_SECRET_ACCESS_KEY,
     )
 
     s3 = boto3.client("s3")
@@ -217,7 +202,7 @@ def main():
     wait_for_comfyui()
 
     print(f"Consumer started. Polling {SQS_QUEUE_URL}")
-    print(f"Uploading to s3://{S3_BUCKET}/{S3_UPLOAD_PREFIX}")
+    print(f"Will upload video to s3://{S3_BUCKET}/{S3_UPLOAD_PREFIX}")
 
     while running:
         try:
@@ -247,8 +232,14 @@ def main():
                 ReceiptHandle=msg["ReceiptHandle"],
             )
             print(f"Message {msg_id} processed and deleted. Uploaded: {uploaded}")
+        except (json.JSONDecodeError, KeyError, AttributeError, TypeError) as e:
+            print(f"Permanent failure for {msg_id}, deleting: {e}")
+            sqs.delete_message(
+                QueueUrl=SQS_QUEUE_URL,
+                ReceiptHandle=msg["ReceiptHandle"],
+            )
         except Exception as e:
-            print(f"Error processing message {msg_id}: {e}")
+            print(f"Transient error for {msg_id}, will retry: {e}")
             # Message will become visible again after VisibilityTimeout
 
     print("Consumer stopped.")
