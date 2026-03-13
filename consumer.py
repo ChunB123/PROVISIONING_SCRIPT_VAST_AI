@@ -16,7 +16,7 @@ Environment variables:
     COMFYUI_URL        - ComfyUI server URL (default: http://127.0.0.1:8188)
     COMFYUI_OUTPUT_DIR - ComfyUI output directory (default: $WORKSPACE/ComfyUI/output)
     S3_BUCKET          - S3 bucket for video uploads
-    S3_PREFIX           - S3 key prefix (default: outputs/)
+    S3_UPLOAD_PREFIX           - S3 key prefix (default: outputs/)
     VISIBILITY_TIMEOUT - SQS visibility timeout in seconds (default: 900)
 """
 
@@ -29,26 +29,19 @@ import json
 import glob
 import signal
 
-SQS_ENDPOINT_URL = os.environ.get("SQS_ENDPOINT_URL", "")
-SQS_QUEUE_URL = os.environ.get("SQS_QUEUE_URL", "")
-SQS_REGION = os.environ.get("SQS_REGION", "us-east-1")
-SQS_ACCESS_KEY_ID = os.environ.get("SQS_ACCESS_KEY_ID", "test")
-SQS_SECRET_ACCESS_KEY = os.environ.get("SQS_SECRET_ACCESS_KEY", "test")
+SQS_QUEUE_URL = os.environ.get("SQS_QUEUE_URL")
+SQS_REGION = "ca-central-1"
+SQS_ACCESS_KEY_ID = os.environ.get("SQS_ACCESS_KEY_ID")
+SQS_SECRET_ACCESS_KEY = os.environ.get("SQS_SECRET_ACCESS_KEY")
 
-COMFYUI_URL = os.environ.get("COMFYUI_URL", "http://127.0.0.1:18188")
-COMFYUI_OUTPUT_DIR = os.environ.get(
-    "COMFYUI_OUTPUT_DIR",
-    os.path.join(os.environ.get("WORKSPACE", "/workspace"), "ComfyUI", "output"),
-)
-COMFYUI_INPUT_DIR = os.environ.get(
-    "COMFYUI_INPUT_DIR",
-    os.path.join(os.environ.get("WORKSPACE", "/workspace"), "ComfyUI", "input"),
-)
+COMFYUI_URL = "http://127.0.0.1:18188"
+COMFYUI_OUTPUT_DIR = os.path.join("/workspace", "ComfyUI", "output")
+COMFYUI_INPUT_DIR = os.path.join("/workspace", "ComfyUI", "input")
 
-S3_BUCKET = os.environ.get("S3_BUCKET", "")
-S3_PREFIX = os.environ.get("S3_PREFIX", "outputs/")
+S3_BUCKET = os.environ.get("S3_BUCKET")
+S3_UPLOAD_PREFIX = "outputs/"
 
-VISIBILITY_TIMEOUT = int(os.environ.get("VISIBILITY_TIMEOUT", "900"))
+VISIBILITY_TIMEOUT = 1200
 
 running = True
 
@@ -160,7 +153,7 @@ def find_output_videos(history_entry):
 def upload_to_s3(s3_client, local_path):
     """Upload a file to S3 and return the S3 key."""
     filename = os.path.basename(local_path)
-    s3_key = f"{S3_PREFIX}{filename}"
+    s3_key = f"{S3_UPLOAD_PREFIX}{filename}"
     print(f"  Uploading {filename} -> s3://{S3_BUCKET}/{s3_key}")
     s3_client.upload_file(local_path, S3_BUCKET, s3_key)
     return s3_key
@@ -205,8 +198,8 @@ def process_message(s3_client, body):
 
 
 def main():
-    if not SQS_ENDPOINT_URL or not SQS_QUEUE_URL:
-        print("ERROR: SQS_ENDPOINT_URL and SQS_QUEUE_URL must be set")
+    if not SQS_QUEUE_URL:
+        print("ERROR: SQS_QUEUE_URL must be set")
         sys.exit(1)
     if not S3_BUCKET:
         print("ERROR: S3_BUCKET must be set")
@@ -214,7 +207,6 @@ def main():
 
     sqs = boto3.client(
         "sqs",
-        endpoint_url=SQS_ENDPOINT_URL,
         region_name=SQS_REGION,
         aws_access_key_id=SQS_ACCESS_KEY_ID,
         aws_secret_access_key=SQS_SECRET_ACCESS_KEY,
@@ -225,7 +217,7 @@ def main():
     wait_for_comfyui()
 
     print(f"Consumer started. Polling {SQS_QUEUE_URL}")
-    print(f"Uploading to s3://{S3_BUCKET}/{S3_PREFIX}")
+    print(f"Uploading to s3://{S3_BUCKET}/{S3_UPLOAD_PREFIX}")
 
     while running:
         try:
