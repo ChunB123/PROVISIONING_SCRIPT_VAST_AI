@@ -109,32 +109,18 @@ def wait_for_completion(prompt_id, timeout=600):
     raise TimeoutError(f"Prompt {prompt_id} did not finish within {timeout}s")
 
 
-def find_output_videos(history_entry):
-    """Extract output video file paths from ComfyUI history entry."""
-    videos = []
+def find_output_video(history_entry):
+    """Extract the output video file path from ComfyUI history entry."""
     outputs = history_entry.get("outputs", {})
     for node_id, node_output in outputs.items():
-        # VHS_VideoCombine puts results under "gifs" key
-        for item in node_output.get("gifs", []):
-            subfolder = item.get("subfolder", "")
-            filename = item["filename"]
-            if subfolder:
-                path = os.path.join(COMFYUI_OUTPUT_DIR, subfolder, filename)
-            else:
-                path = os.path.join(COMFYUI_OUTPUT_DIR, filename)
-            videos.append(path)
-        # Standard SaveImage/SaveVideo uses "images" or "videos" key
-        for key in ("videos", "images"):
+        for key in ("gifs", "videos", "images"):
             for item in node_output.get(key, []):
                 subfolder = item.get("subfolder", "")
                 filename = item["filename"]
                 if subfolder:
-                    path = os.path.join(COMFYUI_OUTPUT_DIR, subfolder, filename)
-                else:
-                    path = os.path.join(COMFYUI_OUTPUT_DIR, filename)
-                if path not in videos:
-                    videos.append(path)
-    return videos
+                    return os.path.join(COMFYUI_OUTPUT_DIR, subfolder, filename)
+                return os.path.join(COMFYUI_OUTPUT_DIR, filename)
+    return None
 
 
 def upload_to_s3(s3_client, local_path):
@@ -155,33 +141,26 @@ def process_message(s3_client, body):
     # Unique noise seed for each generation
     workflow["178"]["inputs"]["noise_seed"] = int(time.time_ns())
 
-    prompt_id = submit_prompt(workflow)
-    history_entry = wait_for_completion(prompt_id, timeout=VISIBILITY_TIMEOUT - 60)
+    try:
+        prompt_id = submit_prompt(workflow)
+        history_entry = wait_for_completion(prompt_id, timeout=VISIBILITY_TIMEOUT - 60)
 
-    videos = find_output_videos(history_entry)
-    if not videos:
-        print("  WARNING: No output videos found in history. Checking output dir...")
-        videos = sorted(
-            glob.glob(os.path.join(COMFYUI_OUTPUT_DIR, "LTX-2*.mp4")),
-            key=os.path.getmtime,
-        )
-        if videos:
-            videos = [videos[-1]]
-
-    if not videos:
-        raise FileNotFoundError("No output video found after generation")
-
-    uploaded_keys = []
-    for video_path in videos:
+        video_path = find_output_video(history_entry)
+        if not video_path:
+            raise FileNotFoundError("No output video found after generation")
         if not os.path.isfile(video_path):
-            print(f"  WARNING: Expected file not found: {video_path}")
-            continue
-        s3_key = upload_to_s3(s3_client, video_path)
-        uploaded_keys.append(s3_key)
-        os.remove(video_path)
-        print(f"  Deleted local file: {video_path}")
+            raise FileNotFoundError(f"Expected file not found: {video_path}")
 
-    return uploaded_keys
+        s3_key = upload_to_s3(s3_client, video_path)
+        return s3_key
+    finally:
+        for d in (COMFYUI_INPUT_DIR, COMFYUI_OUTPUT_DIR):
+            for f in glob.glob(os.path.join(d, "*")):
+                try:
+                    os.remove(f)
+                    print(f"  Cleaned up: {f}")
+                except OSError:
+                    pass
 
 
 def main():
