@@ -101,23 +101,21 @@ function provisioning_start() {
     provisioning_get_files \
         "${COMFYUI_DIR}/models/esrgan" \
         "${ESRGAN_MODELS[@]}"
-    # Download and install the SQS consumer as a systemd service
+    # Download and install the SQS consumer with supervisord
     CONSUMER_URL="https://raw.githubusercontent.com/ChunB123/PROVISIONING_SCRIPT_VAST_AI/refs/heads/main/consumer.py"
-    SERVICE_URL="https://raw.githubusercontent.com/ChunB123/PROVISIONING_SCRIPT_VAST_AI/refs/heads/main/consumer.service"
+    SUPERVISOR_CONF_URL="https://raw.githubusercontent.com/ChunB123/PROVISIONING_SCRIPT_VAST_AI/refs/heads/main/consumer-supervisor.conf"
     CONSUMER_PATH="/workspace/consumer.py"
     printf "Downloading consumer.py...\n"
     wget -qO "$CONSUMER_PATH" "$CONSUMER_URL"
     if [[ -f "$CONSUMER_PATH" ]]; then
-        printf "Setting up consumer systemd service...\n"
-        # Write environment file with current env vars
-        printf 'SQS_QUEUE_URL=%s\nS3_BUCKET=%s\nAWS_ACCESS_KEY_ID=%s\nAWS_SECRET_ACCESS_KEY=%s\n' \
-            "$SQS_QUEUE_URL" "$S3_BUCKET" "$AWS_ACCESS_KEY_ID" "$AWS_SECRET_ACCESS_KEY" > /workspace/consumer.env
-        chmod 600 /workspace/consumer.env
-        # Install systemd unit
-        wget -qO /etc/systemd/system/consumer.service "$SERVICE_URL"
-        systemctl daemon-reload
-        systemctl enable --now consumer.service
-        printf "Consumer service started. \n"
+        printf "Setting up consumer with supervisord...\n"
+        # Install supervisor config
+        mkdir -p /etc/supervisor/conf.d
+        wget -qO /etc/supervisor/conf.d/consumer.conf "$SUPERVISOR_CONF_URL"
+        # Start supervisord now and on reboot
+        /usr/bin/supervisord -c /etc/supervisor/conf.d/consumer.conf &
+        ( crontab -l 2>/dev/null; echo "@reboot /usr/bin/supervisord -c /etc/supervisor/conf.d/consumer.conf" ) | crontab -
+        printf "Consumer service started via supervisord.\n"
     else
         printf "WARNING: Failed to download consumer.py\n"
     fi
