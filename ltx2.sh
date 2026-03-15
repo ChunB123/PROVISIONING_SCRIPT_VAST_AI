@@ -101,17 +101,23 @@ function provisioning_start() {
     provisioning_get_files \
         "${COMFYUI_DIR}/models/esrgan" \
         "${ESRGAN_MODELS[@]}"
-    # Download and start the SQS consumer
+    # Download and install the SQS consumer as a systemd service
     CONSUMER_URL="https://raw.githubusercontent.com/ChunB123/PROVISIONING_SCRIPT_VAST_AI/refs/heads/main/consumer.py"
+    SERVICE_URL="https://raw.githubusercontent.com/ChunB123/PROVISIONING_SCRIPT_VAST_AI/refs/heads/main/consumer.service"
     CONSUMER_PATH="/workspace/consumer.py"
-    CONSUMER_LOG="/workspace/consumer.log"
     printf "Downloading consumer.py...\n"
     wget -qO "$CONSUMER_PATH" "$CONSUMER_URL"
     if [[ -f "$CONSUMER_PATH" ]]; then
-        printf "Starting consumer.py in background...\n"
-        nohup /venv/main/bin/python "$CONSUMER_PATH" >> "$CONSUMER_LOG" 2>&1 &
-        echo $! > /workspace/consumer.pid
-        printf "Consumer started with PID %s. Logs: %s\n" "$(cat /workspace/consumer.pid)" "$CONSUMER_LOG"
+        printf "Setting up consumer systemd service...\n"
+        # Write environment file with current env vars
+        printf 'SQS_QUEUE_URL=%s\nS3_BUCKET=%s\nAWS_ACCESS_KEY_ID=%s\nAWS_SECRET_ACCESS_KEY=%s\n' \
+            "$SQS_QUEUE_URL" "$S3_BUCKET" "$AWS_ACCESS_KEY_ID" "$AWS_SECRET_ACCESS_KEY" > /workspace/consumer.env
+        chmod 600 /workspace/consumer.env
+        # Install systemd unit
+        wget -qO /etc/systemd/system/consumer.service "$SERVICE_URL"
+        systemctl daemon-reload
+        systemctl enable --now consumer.service
+        printf "Consumer service started. \n"
     else
         printf "WARNING: Failed to download consumer.py\n"
     fi
