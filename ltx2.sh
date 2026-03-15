@@ -11,8 +11,6 @@ APT_PACKAGES=(
 )
 
 PIP_PACKAGES=(
-    "boto3"
-    "requests"
 )
 
 NODES=(
@@ -101,24 +99,6 @@ function provisioning_start() {
     provisioning_get_files \
         "${COMFYUI_DIR}/models/esrgan" \
         "${ESRGAN_MODELS[@]}"
-    # Download and install the SQS consumer with supervisord
-    CONSUMER_URL="https://raw.githubusercontent.com/ChunB123/PROVISIONING_SCRIPT_VAST_AI/refs/heads/main/consumer.py"
-    SUPERVISOR_CONF_URL="https://raw.githubusercontent.com/ChunB123/PROVISIONING_SCRIPT_VAST_AI/refs/heads/main/consumer-supervisor.conf"
-    CONSUMER_PATH="/workspace/consumer.py"
-    printf "Downloading consumer.py...\n"
-    wget -qO "$CONSUMER_PATH" "$CONSUMER_URL"
-    if [[ -f "$CONSUMER_PATH" ]]; then
-        printf "Setting up consumer with supervisord...\n"
-        # Install supervisor config
-        mkdir -p /etc/supervisor/conf.d
-        wget -qO /etc/supervisor/conf.d/consumer.conf "$SUPERVISOR_CONF_URL"
-        # Start supervisord now and on reboot
-        /usr/bin/supervisord -c /etc/supervisor/conf.d/consumer.conf &
-        ( crontab -l 2>/dev/null; echo "@reboot /usr/bin/supervisord -c /etc/supervisor/conf.d/consumer.conf" ) | crontab -
-        printf "Consumer service started via supervisord.\n"
-    else
-        printf "WARNING: Failed to download consumer.py\n"
-    fi
     provisioning_print_end
 }
 
@@ -234,4 +214,25 @@ function provisioning_download() {
 # Allow user to disable provisioning if they started with a script they didn't want
 if [[ ! -f /.noprovisioning ]]; then
     provisioning_start
+fi
+
+deactivate
+
+pip install --no-cache-dir boto3 requests
+
+# Download and start the SQS consumer with supervisord
+CONSUMER_URL="https://raw.githubusercontent.com/ChunB123/PROVISIONING_SCRIPT_VAST_AI/refs/heads/main/consumer.py"
+SUPERVISOR_CONF_URL="https://raw.githubusercontent.com/ChunB123/PROVISIONING_SCRIPT_VAST_AI/refs/heads/main/consumer-supervisor.conf"
+CONSUMER_PATH="/workspace/consumer.py"
+printf "Downloading consumer.py...\n"
+wget -qO "$CONSUMER_PATH" "$CONSUMER_URL"
+if [[ -f "$CONSUMER_PATH" ]]; then
+    printf "Setting up consumer with supervisord...\n"
+    mkdir -p /etc/supervisor/conf.d
+    wget -qO /etc/supervisor/conf.d/consumer.conf "$SUPERVISOR_CONF_URL"
+    supervisord -c /etc/supervisor/conf.d/consumer.conf &
+    ( crontab -l 2>/dev/null; echo "@reboot supervisord -c /etc/supervisor/conf.d/consumer.conf" ) | crontab -
+    printf "Consumer service started via supervisord.\n"
+else
+    printf "WARNING: Failed to download consumer.py\n"
 fi
