@@ -230,7 +230,7 @@ if [[ -f "$CONSUMER_PATH" ]]; then
     printf "Setting up consumer with supervisord...\n"
     mkdir -p /etc/supervisor/conf.d
     wget -qO /etc/supervisor/conf.d/consumer.conf "$SUPERVISOR_CONF_URL"
-    supervisord -c /etc/supervisor/conf.d/consumer.conf &
+    supervisord -c /etc/supervisor/conf.d/consumer.conf
     ( crontab -l 2>/dev/null; echo "@reboot supervisord -c /etc/supervisor/conf.d/consumer.conf" ) | crontab -
     printf "Starting consumer service via supervisord.\n"
 else

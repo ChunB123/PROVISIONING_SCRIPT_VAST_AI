@@ -110,7 +110,7 @@ def wait_for_completion(prompt_id, timeout=600):
 
 
 def find_output_video(history_entry):
-    """Extract the output video file path from ComfyUI history entry."""
+    """Extract the first output file path from the ComfyUI history entry."""
     outputs = history_entry.get("outputs", {})
     for node_id, node_output in outputs.items():
         for key in ("gifs", "videos", "images"):
