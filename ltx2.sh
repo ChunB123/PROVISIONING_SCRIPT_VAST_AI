@@ -232,7 +232,7 @@ if [[ -f "$CONSUMER_PATH" ]]; then
     wget -qO /etc/supervisor/conf.d/consumer.conf "$SUPERVISOR_CONF_URL"
     supervisord -c /etc/supervisor/conf.d/consumer.conf &
     ( crontab -l 2>/dev/null; echo "@reboot supervisord -c /etc/supervisor/conf.d/consumer.conf" ) | crontab -
-    printf "Consumer service started via supervisord.\n"
+    printf "Starting consumer service via supervisord.\n"
 else
     printf "WARNING: Failed to download consumer.py\n"
 fi
